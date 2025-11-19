@@ -1,0 +1,12 @@
+stresssub_classes = ["neutral", "stress"]
+
+stresssub1_classes = ["neutral", "stress"]
+stresssub2_classes = ["neutral", "stress"]
+stresssub3_classes = ["neutral", "stress"]
+stresssub4_classes = ["neutral", "stress"]
+stresssub5_classes = ["neutral", "stress"]
+stresssub6_classes = ["neutral", "stress"]
+stresssub7_classes = ["neutral", "stress"]
+stresssub8_classes = ["neutral", "stress"]
+stresssub9_classes = ["neutral", "stress"]
+stresssub10_classes = ["neutral", "stress"]
