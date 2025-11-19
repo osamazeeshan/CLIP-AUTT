@@ -7,16 +7,13 @@ import torch
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
-from data.hoi_dataset import BongardDataset
 try:
     from torchvision.transforms import InterpolationMode
     BICUBIC = InterpolationMode.BICUBIC
 except ImportError:
     BICUBIC = Image.BICUBIC
 
-from data.fewshot_datasets import *
 import data.augmix_ops as augmentations
-from data.land_datasets import MediapipeFaceDataset
 
 ID_to_DIRNAME={
     'I': 'ImageNet',
@@ -75,22 +72,10 @@ def build_dataset(set_id, transform, data_root, mode='test', n_shot=None, split=
 
     elif set_id in ['biosub', 'stresssub']:
         testdir = os.path.join(data_root, ID_to_DIRNAME[set_id+sub_id])
-        if use_landmarks:
-            testset = MediapipeFaceDataset(testdir, transform=transform, expand_ratio=1, max_landmarks=max_landmarks)
-        else:
-            testset = datasets.ImageFolder(testdir, transform=transform)
+        testset = datasets.ImageFolder(testdir, transform=transform)
     elif set_id in ['raftrains', 'raftests']:
         testdir = os.path.join(data_root, ID_to_DIRNAME[set_id])
         testset = datasets.ImageFolder(testdir, transform=transform)
-    elif set_id in fewshot_datasets:
-        if mode == 'train' and n_shot:
-            testset = build_fewshot_dataset(set_id, os.path.join(data_root, ID_to_DIRNAME[set_id.lower()]), transform, mode=mode, n_shot=n_shot)
-        else:
-            testset = build_fewshot_dataset(set_id, os.path.join(data_root, ID_to_DIRNAME[set_id.lower()]), transform, mode=mode)
-    elif set_id == 'bongard':
-        assert isinstance(transform, Tuple)
-        base_transform, query_transform = transform
-        testset = BongardDataset(data_root, split, mode, base_transform, query_transform, bongard_anno)
     else:
         raise NotImplementedError
         

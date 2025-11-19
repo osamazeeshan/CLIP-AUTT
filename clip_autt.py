@@ -33,15 +33,12 @@ except ImportError:
 import torchvision.models as models
 
 from clip.custom_clip import get_coop, GradCAM, VClip
-from clip.cocoop import get_cocoop
-from data.imagnet_prompts import imagenet_classes
-from data.biovid_prompts import biosub_classes, raftrains_classes, raftests_classes
+from data.biovid_prompts import biosub_classes
 from data.stress_prompts import stresssub_classes
 from data.bah_prompts import bahssub_classes
 
 from data.datautils import AugMixAugmenter, build_dataset
 from utils.tools import Summary, AverageMeter, ProgressMeter, accuracy, load_model_weight, set_random_seed, create_target_folders, MetricLogger, load_bah_src_subs
-from data.cls_to_names import *
 
 from utils.visualize import *
 
@@ -101,8 +98,8 @@ def rebuild_optimizer(model, lr):
 def main():
     args = parser.parse_args()
     set_random_seed(get_default_seed())
-
-    if args.current_ds is config.BIOVID:
+    print(args.current_ds )
+    if args.current_ds == config.BIOVID:
         '''
         BioVid Random Source subjects
         '''
@@ -117,7 +114,7 @@ def main():
         
         target_subject_list = ['081014_w_27','101609_m_36','112009_w_43','091809_w_43','071309_w_21','073114_m_25','080314_w_25','073109_w_28','100909_w_65','081609_w_40']
 
-    elif args.current_ds is config.STRESS:
+    elif args.current_ds == config.STRESS:
         '''
         StressID Random Source subjects
         '''
@@ -127,7 +124,7 @@ def main():
                             '2ea4','2hpu','y8c3','kkf5','h8r2','iqyg','y9z6','f6q3','e5p4','k67g',  # 40
                             '8i4i', 'k2v7','4e8r','wssm']
         target_subject_list = ["kycf","uymz","h8s1","ctzy","p9i3","7h5u","g7r2","b9w0","r3zm","x1q3"]
-    elif args.current_ds is config.BAH:
+    elif args.current_ds == config.BAH:
         '''
         BAH_DB Random Source subjects
         '''
@@ -139,7 +136,7 @@ def main():
     file_name = 'logs/'+str(args.ctx_init)+'-au_topP='+str(args.au_topP)+'-stp='+str(args.tta_steps)+'-n_Ctx='+str(args.n_ctx)+'-landmarks='+str(args.use_landmarks)+'-sel_t='+str(args.selection_p)+'-num_land='+str(args.num_landmarks)+'.txt'
 
 
-    if args.current_ds is config.BIOVID:
+    if args.current_ds == config.BIOVID:
         args.srcs_file_name='lab_srcs77_biovid_ep10_bs8_sql16_str2_vid'
         args.pain_db_root_path = config.BIOVID_PATH
         args.test_sets = 'biosub0/biosub1/biosub2/biosub3/biosub4/biosub5/biosub6/biosub7/biosub8/biosub9'
@@ -148,13 +145,13 @@ def main():
         args.srcs_label_file_name= 'lab_srcs78_082208w45_081714m36_112610w60_101908m61_071709w23_082014w24_110810m62_080209w26_101916m40_110614m42_____only'
         args.srcs_label_val_file_name=None
         
-    elif args.current_ds is config.STRESS:
+    elif args.current_ds == config.STRESS:
         args.srcs_file_name='lab_srcs44_stress_ep20_bs8_sql16_str1_vid'
         args.pain_db_root_path = config.STRESS_PATH
         args.test_sets = 'stresssub0/stresssub1/stresssub2/stresssub3/stresssub4/stresssub5/stresssub6/stresssub7/stresssub8/stresssub9'
         args.srcs_label_file_name= 'stress_source_sub_labels'
         args.srcs_label_val_file_name= None
-    elif args.current_ds is config.BAH:
+    elif args.current_ds == config.BAH:
         args.pain_db_root_path = config.BAH_DATASET_FRAMES_PATH
         args.test_sets = 'bahssub0/bahssub1/bahssub2/bahssub3/bahssub4/bahssub5/bahssub6/bahssub7/bahssub8/bahssub9'
         args.srcs_label_file_name= 'bah_source_sub_train_labels'
@@ -176,7 +173,7 @@ def main():
         experiment.log_parameter("frame_stride", args.frame_stride)
         experiment.log_parameter("key_frame_sel", args.key_frame_sel)
         experiment.log_parameter("Key frames", args.key_frames)
-
+        print(source_list_name)
         main_worker(args.gpu, args, file_name, source_list_name, target_subject_list)
 
 
@@ -188,11 +185,9 @@ def main_worker(gpu, args, file_name, source_list_name, target_subject_list):
     print("Load train text adpt and classifier model: ", args.load_t_adpt_cl_mod)
 
 
-    if args.current_ds is config.RAF_DB:
-        classnames = raftrains_classes
-    elif args.current_ds is config.STRESS:
+    if args.current_ds == config.STRESS:
         classnames = stresssub_classes 
-    elif args.current_ds is config.BAH:
+    elif args.current_ds == config.BAH:
         classnames = bahssub_classes
     else:
         classnames = biosub_classes
@@ -254,8 +249,8 @@ def main_worker(gpu, args, file_name, source_list_name, target_subject_list):
         trainable_params = model.prompt_learner.parameters()
         print("[INFO] Training prompt learner only (image mode).")
 
-        optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=1e-4)
-        optim_state = deepcopy(optimizer.state_dict())
+    optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=1e-4)
+    optim_state = deepcopy(optimizer.state_dict())
 
     # setup automatic mixed-precision (Amp) loss scaling
     scaler = torch.cuda.amp.GradScaler(init_scale=1000)
@@ -271,11 +266,11 @@ def main_worker(gpu, args, file_name, source_list_name, target_subject_list):
     '''
         Here Training AU Adapter and Classifier using Source Data
     '''
-    if (args.train_t_adpt_cl or args.train_whole_clip_model) and args.current_ds is not config.RAF_DB:
+    if (args.train_t_adpt_cl or args.train_whole_clip_model):
         print(f"=== Source file name: {args.srcs_file_name}")
         srcs_loader, srcs_val_loader, srcs_test_loader = BaseDataset.load_pain_dataset(args.pain_db_root_path, 
-                                args.srcs_label_file_name+('.csv' if args.current_ds is config.BAH else '.txt'), 
-                                (args.srcs_label_val_file_name+'.csv' if args.current_ds is config.BAH else None), 
+                                args.srcs_label_file_name+('.csv' if args.current_ds == config.BAH else '.txt'), 
+                                (args.srcs_label_val_file_name+'.csv' if args.current_ds == config.BAH else None), 
                                 args.batch_size, BICUBIC, args.resolution, phase='src', 
                                 seq_len=args.seq_len, frame_stride=args.frame_stride)
     source_model_path = os.path.join(config.WEIGHTS_FOLDER, args.current_ds, args.srcs_file_name+'.pth')
@@ -322,10 +317,10 @@ def main_worker(gpu, args, file_name, source_list_name, target_subject_list):
             else:
                 batchsize = args.batch_size
         
-        with open(file_name, "a") as f:  
-            f.write("=> Model created: visual backbone {}".format(args.arch))
-            f.write("\nPrompt: {}".format(args.ctx_init))
-            f.write("\nSubject: {}".format(set_id))
+        # with open(file_name, "a") as f:  
+        #     f.write("=> Model created: visual backbone {}".format(args.arch))
+        #     f.write("\nPrompt: {}".format(args.ctx_init))
+        #     f.write("\nSubject: {}".format(set_id))
 
         print("evaluating: {}".format(set_id))
         if 'bio' or 'stress' in set_id:
@@ -358,11 +353,11 @@ def main_worker(gpu, args, file_name, source_list_name, target_subject_list):
             ''' Load Target data using file for Videos '''
             tar_sub_id = target_subject_list[int(sub_id)]
             tar_file_name = os.path.join(config.WEIGHTS_FOLDER, str(int(sub_id)+1)+'-'+tar_sub_id, 'files', 
-                                tar_sub_id+('.csv' if args.current_ds is config.BAH else '.txt'))
+                                tar_sub_id+('.csv' if args.current_ds == config.BAH else '.txt'))
             val_loader, _, _ = BaseDataset.load_pain_dataset(args.pain_db_root_path, tar_file_name, 
                             None, batchsize, BICUBIC, args.resolution, phase='tar', seq_len=args.seq_len, frame_stride=args.frame_stride)
         else:
-            val_dataset = build_dataset(set_id, data_transform, args.data, mode=args.dataset_mode, sub_id=sub_id if args.current_ds is config.BIOVID else '0', use_landmarks=args.use_landmarks, max_landmarks=args.num_landmarks)
+            val_dataset = build_dataset(set_id, data_transform, args.data, mode=args.dataset_mode, sub_id=sub_id if args.current_ds == config.BIOVID else '0', use_landmarks=args.use_landmarks, max_landmarks=args.num_landmarks)
             print("number of test samples: {}".format(len(val_dataset)))
             val_loader = torch.utils.data.DataLoader(
                         val_dataset,
@@ -375,17 +370,17 @@ def main_worker(gpu, args, file_name, source_list_name, target_subject_list):
             print("[INFO] AU Adapter and Classifier Loaded: ", source_model_path)
 
             if args.eval_au_adpt_cl:
-                evaluate_txt_adapter_n_au_classifier(args, saved_model, val_loader if args.current_ds is config.RAF_DB else srcs_val_loader)
+                evaluate_txt_adapter_n_au_classifier(args, saved_model, srcs_val_loader)
                 break
             elif args.eval_au_tar_sb:
                 TSNE_ALL_SUB_LABLES = evaluate_txt_adapter_n_au_classifier(args, model, val_loader, sub_id, args.eval_au_tar_sb)
                 continue
         # continue
         if args.train_t_adpt_cl or args.train_whole_clip_model:
-            model = train_txt_adapter_n_au_classifier(args, model, emoclip_model, val_loader if args.current_ds is config.RAF_DB else srcs_loader, srcs_val_loader,
+            model = train_txt_adapter_n_au_classifier(args, model, emoclip_model, srcs_loader, srcs_val_loader,
                                             scaler, optimizer, optim_state, classnames, source_model_path, num_epochs=args.t_adap_epoch, 
                                             save_path=source_model_path, train_clip_model=args.train_whole_clip_model)
-            evaluate_txt_adapter_n_au_classifier(args, model, val_loader if args.current_ds is config.RAF_DB else srcs_val_loader)
+            evaluate_txt_adapter_n_au_classifier(args, model, srcs_val_loader)
             break
         if args.adapt_tar_sub:
             target_path = os.path.join(target_weight_path, 'adapt_model.pth')
@@ -398,7 +393,7 @@ def train_txt_adapter_n_au_classifier(args, model, emoclip_model, train_loader, 
                                       num_epochs=10, save_path="clip_au_model_vit32_au46.pth", train_clip_model=False):
     optimizer.load_state_dict(optim_state)
 
-    if args.current_ds is config.BAH:
+    if args.current_ds == config.BAH:
         class_prompt = CLASS_PROMPTS_AMBV
     else:
         class_prompt = CLASS_PROMPTS
@@ -430,7 +425,7 @@ def train_txt_adapter_n_au_classifier(args, model, emoclip_model, train_loader, 
             if args.adapt_per_video:
                 model = load_txt_adapter_classifier(source_model_path, model, args, device)
                 optimizer = rebuild_optimizer(model, args.lr)
-            images = images.cuda(args.gpu, non_blocking=True) if args.current_ds is not config.RAF_DB else images[0].cuda(args.gpu, non_blocking=True)
+            images = images.cuda(args.gpu, non_blocking=True)
             labels = labels.cuda(args.gpu, non_blocking=True)
 
             with torch.cuda.amp.autocast():
@@ -524,7 +519,7 @@ def train_txt_adapter_n_au_classifier(args, model, emoclip_model, train_loader, 
                     if hasattr(model, "temporal_classifier"):
                         save_dict["temporal_classifier"] = model.temporal_classifier.state_dict()
                     
-                    print(f"[INFO] Saving video model components: {list(save_dict.keys())}")
+                    print(f"[INFO] Saving video model components: {list(save_dict.keys())}")                    
                     torch.save(save_dict, save_path)
             else:
                 # Save only the trainable parts

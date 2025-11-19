@@ -18,7 +18,7 @@ from torchvision.transforms import Compose, ToTensor
 from torchvision import transforms, datasets
 from torchvision.io import read_image
 
-from datasets.dataset import MNISTM, FerDatasets, PainDatasets, BAHDatasets, PainVideoDatasets, PainSeqDatasets, TemporalPainDataset, TemporalBAHDataset
+from datasets.dataset import FerDatasets, PainDatasets, BAHDatasets, PainVideoDatasets, PainSeqDatasets, TemporalPainDataset, TemporalBAHDataset
 from utils.transforms import GrayscaleToRgb, TemporalDownSample, RandomSequence
 
 import matplotlib.pyplot as plt

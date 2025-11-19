@@ -14,11 +14,8 @@ import os
 
 from clip import load, tokenize
 from .simple_tokenizer import SimpleTokenizer as _Tokenizer
-from data.imagnet_prompts import imagenet_classes
-from data.fewshot_datasets import fewshot_datasets
 from data.biovid_prompts import biosub_classes
 from data.bah_prompts import bahssub_classes
-from data.cls_to_names import *
 from .transformer import TemporalTransformer
 import copy
 import types
@@ -1183,9 +1180,7 @@ class ClipTestTimeVideoTuning(nn.Module):
 
 
 def get_coop(clip_arch, test_set, device, n_ctx, ctx_init, num_aus=46, num_classes=2, au_prompts=None, learned_cls=False, is_video_clip=False, frame_stride=1, key_frames=16):
-    if test_set in fewshot_datasets:
-        classnames = eval("{}_classes".format(test_set.lower()))
-    elif test_set == 'bongard':
+    if test_set == 'bongard':
         if learned_cls:
             classnames = ['X', 'X']
         else:
