@@ -3,8 +3,8 @@ import os
 
 ROOT_DIR = os.environ["HOME"]
 
-ROOT_DIR_LOCAL = '/projets/AS08960' 
-ROOT_DIR_LOC_PRJ = '/projets/AS08960'
+ROOT_DIR_LOCAL = '/projets/ID' 
+ROOT_DIR_LOC_PRJ = '/projets/ID'
 
 CURRENT_DIR = os.path.abspath(os.getcwd())
 
