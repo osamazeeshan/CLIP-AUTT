@@ -380,7 +380,7 @@ def main_worker(gpu, args, file_name, source_list_name, target_subject_list):
             model = train_txt_adapter_n_au_classifier(args, model, emoclip_model, srcs_loader, srcs_val_loader,
                                             scaler, optimizer, optim_state, classnames, source_model_path, num_epochs=args.t_adap_epoch, 
                                             save_path=source_model_path, train_clip_model=args.train_whole_clip_model)
-            evaluate_txt_adapter_n_au_classifier(args, model, srcs_val_loader)
+            evaluate_txt_adapter_n_au_classifier(args, model, srcs_val_loader, sub_id, args.eval_au_tar_sb)
             break
         if args.adapt_tar_sub:
             target_path = os.path.join(target_weight_path, 'adapt_model.pth')
@@ -402,9 +402,6 @@ def train_txt_adapter_n_au_classifier(args, model, emoclip_model, train_loader, 
     if args.adapt_tar_sub:
         model = load_txt_adapter_classifier(source_model_path, model, args, device)
         optimizer = rebuild_optimizer(model, args.lr)
-
-    # count_trainable_params(model)
-    times = []
 
     save_dict = {}
     best_acc, best_f1 = 0, 0
@@ -435,7 +432,6 @@ def train_txt_adapter_n_au_classifier(args, model, emoclip_model, train_loader, 
 
                     loss = entropy_loss(logits, class_weights)
                 else:
-                    start = time.time()
                     logits, au_sim = model(images, AU_PROMPTS, CLASS_PROMPTS if args.include_cls_prompt else None, mode=("temporal" if args.is_video_clip else "au"), 
                                 adapt_target=args.adapt_tar_sub, train_whole_clip=train_clip_model)   # forward pass
                     loss = criterion(logits, labels)     # loss, DO NOT .item() here
@@ -449,10 +445,6 @@ def train_txt_adapter_n_au_classifier(args, model, emoclip_model, train_loader, 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-
-            torch.cuda.synchronize() 
-            end = time.time()
-            times.append(end - start)
 
             batch_size = images.size(0)
             running_loss += loss.item() * batch_size
@@ -469,9 +461,6 @@ def train_txt_adapter_n_au_classifier(args, model, emoclip_model, train_loader, 
         # end of epoch metrics
         all_labels = torch.cat(all_labels)
         all_preds = torch.cat(all_preds)
-
-        avg_time = sum(times) / len(times)
-        print(f"Average per-batch time: {avg_time:.4f} sec")
 
         epoch_loss = running_loss / total_samples
 
@@ -625,7 +614,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--train_whole_clip_model', type=bool, default=False, help="Train complete Clip model using au PROMPTS")
 
-    parser.add_argument('--train_t_adpt_cl', type=bool, default=True, help="train_txt_adapt_classifer")
+    parser.add_argument('--train_t_adpt_cl', type=bool, default=False, help="train_txt_adapt_classifer")
     parser.add_argument('--t_adap_epoch', default=10, type=int, help="Text and AU classifier training epochs")
     parser.add_argument('--iter_limit', default=10, type=int, help='Limit loop')
 
