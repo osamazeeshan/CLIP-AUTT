@@ -1048,6 +1048,64 @@ class ClipTestTimeVideoTuning(nn.Module):
         return selected_idx
 
 
+    def select_key_consec_frames_temporal(self, video_feats, adapted_embeds, top_k=16):
+        """
+        Select top-K consecutive frames with lowest entropy calculated after temporal aggregation.
+        Args:
+            video_feats: [T, D] CLIP visual frame features (normalized)
+            adapted_embeds: [num_AUs, D] AU text embeddings (after adapter + norm)
+            top_k: number of consecutive frames to keep
+        Returns:
+            List[int]: indices of selected consecutive frames
+        """
+        T = video_feats.size(0)
+        
+        # If video is shorter than window size, return all frames
+        if T <= top_k:
+            return list(range(T))
+
+        window_entropies = []
+
+        # Iterate through all possible consecutive windows
+        for i in range(T - top_k + 1):
+            # 1. Select window features: [top_k, D]
+            window_feats = video_feats[i : i + top_k]
+            
+            # 2. Add batch dimension: [1, top_k, D]
+            # The temporal module snippet expects [B, D, T] input (transposed)
+            window_feats_batch = window_feats.unsqueeze(0) 
+            
+            # 3. Apply Temporal Module
+            # Input transposes to [1, D, top_k]
+            v = self.temporal(window_feats_batch.transpose(1, 2))
+            v = F.gelu(v)
+            
+            # 4. Aggregate temporally: [1, D]
+            visual_embeds = v.mean(dim=-1)
+            
+            # Normalize the aggregated visual embedding
+            visual_embeds = F.normalize(visual_embeds, dim=-1)
+            
+            # 5. Compute AU Similarity: [1, num_AUs]
+            # adapted_embeds is [num_AUs, D], so we transpose it
+            au_sim = visual_embeds @ adapted_embeds.T
+            
+            # 6. Apply Temporal Classifier to get logits: [1, num_classes]
+            logits = self.temporal_classifier(au_sim)
+            
+            # 7. Compute Entropy
+            probs = F.softmax(logits, dim=-1)
+            entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=-1) # Scalar [1]
+            
+            window_entropies.append(entropy.item())
+
+        # --- Find window with lowest entropy (most confident aggregated segment) ---
+        start_idx = torch.argmin(torch.tensor(window_entropies)).item()
+        selected_idx = list(range(start_idx, start_idx + top_k))
+
+        return selected_idx
+
+
     def temporal_clip_au_forward(self, video, au_prompts, class_prompts, adapt_tar=False, key_frame_sel=False, train_whole_clip=False, key_frames=16):
         """
         Simple temporal CLIP forward:
@@ -1096,7 +1154,11 @@ class ClipTestTimeVideoTuning(nn.Module):
         if adapt_tar and key_frame_sel:
             for b in range(B):
                 frame_feats = img_feats[b]  # [T, 512]
-                key_idx = self.select_key_consec_frames(frame_feats, text_embeds_norm, top_k=key_frames) # Biovid=16 and Stress=6
+                # key_idx = self.select_key_consec_frames(frame_feats, text_embeds_norm, top_k=key_frames) # Biovid=16
+                '''
+                    [INFO] Selecting Window using Temporal Module: window->AU-sim->EmoClassifier->Entropy: select frame window with lowest entropy										
+                '''
+                key_idx = self.select_key_consec_frames_temporal(frame_feats, text_embeds_norm, top_k=key_frames) 
                 selected_feats.append(frame_feats[key_idx])
 
             max_T = max(len(f) for f in selected_feats)
